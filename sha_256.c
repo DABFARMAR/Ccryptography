@@ -9,7 +9,13 @@ uint32_t rotFunctions(uint32_t, int);
 uint32_t generalFunctions(uint32_t, uint32_t, uint32_t,int);
 
 
-int main() {
+int main(int argc, char* argv[]) {
+  if(argc != 2){
+    perror("Usage: program <word>");
+    return EXIT_FAILURE;
+
+  }
+  
   static const unsigned int k[64] = {
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
     0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -35,73 +41,68 @@ int main() {
     0x1f83d9ab, 0x5be0cd19
   };
 
-  unsigned int w[8] = {
+  unsigned int aux[8] = {
     0x6a09e667, 0xbb67ae85, 0x3c6ef372,
     0xa54ff53a, 0x510e527f, 0x9b05688c,
     0x1f83d9ab, 0x5be0cd19
   };
-
-
   
-  uint32_t Ch =  generalFunctions(p[4],p[5],p[6],0);
-  uint32_t Maj = generalFunctions(p[0],p[1],p[2],1);
-  uint32_t Z0 =  generalFunctions(p[0],p[1],p[2],2);
-  uint32_t Z1 =  generalFunctions(p[4],p[1],p[2],3);
-
-
-  uint32_t T1 = Z1 + Ch;
-  uint32_t T2 = Z0 + Maj;
-
+  char *word = argv[1];
   
-  char *word = "Hola mundo";
+  uint32_t *w = stringTo32Bit(word); 
+  w = sigmaFunction(w); 
   
-  // Building Wt variable
-  uint32_t *packed = stringTo32Bit(word); 
-  packed = sigmaFunction(packed); 
-  
+  uint32_t auxiliar_var = 0;
+  uint32_t auxiliar_var2 = 0;
+
   for(int j = 0; j < 64; j++){
-    printf("%.8x\n",*(packed + j));
+    
+    uint32_t T1 = p[7] +  generalFunctions(p[4],p[4],p[4],3) + generalFunctions(p[4],p[5],p[6],0) + k[j] + w[j];
+    uint32_t T2 = generalFunctions(p[0],p[0],p[0],2) +  generalFunctions(p[0],p[1],p[2],1);
+
+    auxiliar_var = p[0];
+    p[0] = T1 + T2;
+    
+    for(int i = 1; i < 8; i++){
+
+      auxiliar_var2 = p[i];
+
+      if(i == 4){
+	p[4] = auxiliar_var + T1;
+      } else {
+	p[i] = auxiliar_var;
+      }
+      
+      auxiliar_var = auxiliar_var2; 
+
+    }
     
   }
   
+  for(int m = 0; m < 8; m++){
+    printf("%.8x\n",p[m]);
+
+  }
+  printf("\n");
+
   return 0;
 }
 
 uint32_t generalFunctions(uint32_t x, uint32_t y, uint32_t z, int tp){
 
-
   switch(tp){
   case 0:
-    return ((x & y) ^ ( ~x & z));
+    return ((x & y) ^ ( ~x & z)); //Ch
   case 1:
-    return ((x & y) ^ ( x & z) ^ (y ^ z));
+    return ((x & y) ^ ( x & z) ^ (y ^ z)); // Maj
   case 2:
-    return ( ( (x >> 2)   | (x << (32 - 2)))) ^ ( ( (x >> 13)   | (x << (32 - 13)))) ^ ( ( (x >> 22)   | (x << (32 - 22))));
+    return ( ( (x >> 2)   | (x << (32 - 2)))) ^ ( ( (x >> 13)   | (x << (32 - 13)))) ^ ( ( (x >> 22)   | (x << (32 - 22)))); //SIGMA 0
   case 3:
-    return ( ( (x >> 6)   | (x << (32 - 6)))) ^ ( ( (x >> 11)   | (x << (32 - 11)))) ^ ( ( (x >> 25)   | (x << (32 - 25))));
-    
-  }
-
-}
-
-
-
-
-
- //(x << d) | (x >> (n - d)); n -> len , d -> bits move
-uint32_t rotFunctions(uint32_t element,int tp){
-
-  
-
-  if(tp == 0){
-    uint32_t a = ((element >> 3) & (uint32_t)-1 ) ^ ( (element >> 7)   | (element << (32 - 7)))  ^ ( (element >> 18)  | (element << (32 - 18)));
-    return a;
-
-  } else {
-
-    uint32_t b = ((element >> 10)& (uint32_t)-1 ) ^ ( (element >> 17)  | (element << (32 - 17))) ^ ( (element >> 19)  | (element << (32 - 19))); 
-    return b;
-
+    return ( ( (x >> 6)   | (x << (32 - 6)))) ^ ( ( (x >> 11)   | (x << (32 - 11)))) ^ ( ( (x >> 25)   | (x << (32 - 25)))); //SIGMA 1
+  case 4:
+    return  ((x >> 3) & (uint32_t)-1 ) ^ ( (x >> 7)   | (x << (32 - 7)))  ^ ( (x >> 18)  | (x << (32 - 18))); //sigma 0
+  case 5:
+    return  ((x >> 10)& (uint32_t)-1 ) ^ ( (x >> 17)  | (x << (32 - 17))) ^ ( (x >> 19)  | (x << (32 - 19)));  // sigma 1
   }
 
 }
@@ -109,11 +110,15 @@ uint32_t rotFunctions(uint32_t element,int tp){
 uint32_t *sigmaFunction(uint32_t *array){
   for(int j = 16; j < 64; j++){
       
-    *(array + j) = *(array + (j-7)) + *(array + (j-16)) + rotFunctions(*(array + (j - 15)),0) + rotFunctions(*(array + (j - 2 )),1); // sigma0 +  sigma1 
+    *(array + j) = *(array + (j-7)) + *(array + (j-16)) + generalFunctions(*(array + (j - 15)),*(array + (j - 15)),*(array + (j - 15)),4) + generalFunctions(*(array + (j - 2)),*(array + (j - 15)),*(array + (j - 15)),5);
+
   }
   return array;
 }
 
+
+
+//Wt variable 
 uint32_t *stringTo32Bit(const char *str) {
   uint32_t *array = (uint32_t *)calloc(64,sizeof(uint32_t));
 
