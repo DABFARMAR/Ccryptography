@@ -3,10 +3,18 @@
 #include <string.h>
 #include <stdint.h>
 
+
+#define Ch(x,y,z)   ((x & y) ^ ( ~x & z)) //Ch
+#define Maj(x,y,z)  ((x & y) ^ ( x & z) ^ (y & z)) // Maj
+#define SIG0(x) (( ( (x >> 2) | (x << (32 - 2)) ) ) ^ ( ( (x >> 13) | (x << (32 - 13)) ) ) ^ ( ( (x >> 22) | (x << (32 - 22)) ) )) //SIGMA 0
+#define SIG1(x) (( ( (x >> 6) | (x << (32 - 6)) ) ) ^ ( ( (x >> 11) | (x << (32 - 11)) ) ) ^ ( ( (x >> 25) | (x << (32 - 25)) ) ))//SIGMA 1
+#define sig0(x) (((x >> 3)) ^ ((x >> 7)   | (x << (32 - 7)))  ^ ((x >> 18)  | (x << (32 - 18)))) //sigma 0
+#define sig1(x) (((x >> 10)) ^ ((x >> 17) | (x << (32 - 17))) ^ ((x >> 19)  | (x << (32 - 19))))  // sigma 1
+
+
+
 uint32_t *stringTo32Bit(const char *);
 uint32_t *sigmaFunction(uint32_t *);
-uint32_t rotFunctions(uint32_t, int);
-uint32_t generalFunctions(uint32_t, uint32_t, uint32_t,int);
 
 
 int main(int argc, char* argv[]) {
@@ -46,72 +54,46 @@ int main(int argc, char* argv[]) {
     0xa54ff53a, 0x510e527f, 0x9b05688c,
     0x1f83d9ab, 0x5be0cd19
   };
+
+  aux = p;
   
   char *word = argv[1];
-  
+    
   uint32_t *w = stringTo32Bit(word); 
   w = sigmaFunction(w); 
-  
-  uint32_t auxiliar_var = 0;
-  uint32_t auxiliar_var2 = 0;
 
   for(int j = 0; j < 64; j++){
-    
-    uint32_t T1 = p[7] +  generalFunctions(p[4],p[4],p[4],3) + generalFunctions(p[4],p[5],p[6],0) + k[j] + w[j];
-    uint32_t T2 = generalFunctions(p[0],p[0],p[0],2) +  generalFunctions(p[0],p[1],p[2],1);
 
-    auxiliar_var = p[0];
-    p[0] = T1 + T2;
-    
-    for(int i = 1; i < 8; i++){
+    uint32_t T1 = p[7] + k[j] + w[j] + SIG1(p[4]) + Ch(p[4],p[5],p[6]);
+    uint32_t T2 = SIG0(p[0]) + Maj(p[0],p[1],p[2]);
 
-      auxiliar_var2 = p[i];
-
-      if(i == 4){
-	p[4] = auxiliar_var + T1;
-      } else {
-	p[i] = auxiliar_var;
-      }
-      
-      auxiliar_var = auxiliar_var2; 
-
-    }
+    p[7] = p[6]; // h = g
+    p[6] = p[5]; // g = f 
+    p[5] = p[4]; // f = e
+    p[4] = p[3] + T1; // e = p[3] + T1
+    p[3] = p[2]; // d = c
+    p[2] = p[1]; // c = b
+    p[1] = p[0]; // b = a
+    p[0] = T1 + T2; // a = T1 + T2
     
   }
-  
-  for(int m = 0; m < 8; m++){
-    printf("%.8x\n",p[m]);
+
+  for(int i = 0; i < 8; i++){
+    printf("%.8x",(p[i] + aux[i]));
 
   }
   printf("\n");
 
+  free(w);
   return 0;
 }
 
-uint32_t generalFunctions(uint32_t x, uint32_t y, uint32_t z, int tp){
 
-  switch(tp){
-  case 0:
-    return ((x & y) ^ ( ~x & z)); //Ch
-  case 1:
-    return ((x & y) ^ ( x & z) ^ (y ^ z)); // Maj
-  case 2:
-    return ( ( (x >> 2)   | (x << (32 - 2)))) ^ ( ( (x >> 13)   | (x << (32 - 13)))) ^ ( ( (x >> 22)   | (x << (32 - 22)))); //SIGMA 0
-  case 3:
-    return ( ( (x >> 6)   | (x << (32 - 6)))) ^ ( ( (x >> 11)   | (x << (32 - 11)))) ^ ( ( (x >> 25)   | (x << (32 - 25)))); //SIGMA 1
-  case 4:
-    return  ((x >> 3) & (uint32_t)-1 ) ^ ( (x >> 7)   | (x << (32 - 7)))  ^ ( (x >> 18)  | (x << (32 - 18))); //sigma 0
-  case 5:
-    return  ((x >> 10)& (uint32_t)-1 ) ^ ( (x >> 17)  | (x << (32 - 17))) ^ ( (x >> 19)  | (x << (32 - 19)));  // sigma 1
-  }
 
-}
 
 uint32_t *sigmaFunction(uint32_t *array){
   for(int j = 16; j < 64; j++){
-      
-    *(array + j) = *(array + (j-7)) + *(array + (j-16)) + generalFunctions(*(array + (j - 15)),*(array + (j - 15)),*(array + (j - 15)),4) + generalFunctions(*(array + (j - 2)),*(array + (j - 15)),*(array + (j - 15)),5);
-
+    *(array + j) = *(array + j - 7) + *(array + j - 16) + sig0(*(array + j - 15)) + sig1(*(array + j - 2 ));
   }
   return array;
 }
